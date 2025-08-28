@@ -1,0 +1,23 @@
+:root {
+  --bg: #0f0f10;
+  --panel: #151517;
+  --panel-2: #1b1b1f;
+  --text: #e6e6e6;
+  --muted: #a7a7ad;
+  --accent: #3b82f6;
+  --border: #2a2a30;
+  --ok: #16a34a;     /* grønn */
+  --warn: #f59e0b;   /* gul */
+  --bad: #dc2626;    /* rød */
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
