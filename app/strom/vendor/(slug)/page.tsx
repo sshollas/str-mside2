@@ -6,7 +6,7 @@ export const revalidate = 900;
 export const runtime = "nodejs";
 
 function jsonLd(dump: PriceDump) {
-  const list = Array.isArray(dump?.offers) ? dump.offers : [];
+  const list = Array.isArray(dump?.offers) ? dump.offers.filter((o) => !!o.url && o.url.trim().length > 0) : [];
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -27,7 +27,7 @@ function jsonLd(dump: PriceDump) {
         },
       },
     })),
-  };
+  } as const;
 }
 
 export default async function Page() {
@@ -39,7 +39,7 @@ export default async function Page() {
         <header className="page-header">
           <h1 className="text-2xl font-semibold">Strømsammenligning</h1>
           <p className="text-sm opacity-80">
-            Sammenlign spotpris, månedsavgift og estimert pris pr. måned.
+            Sammenlign påslag, månedsavgift og estimert pris pr. måned.
           </p>
         </header>
         <StromClient initialDump={data} />

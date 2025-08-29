@@ -1,0 +1,19 @@
+# Normaliser linjeslutt
+* text=auto eol=lf
+
+# Behandle bilder som binær
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.mp4 binary
+*.mov binary
+*.pdf binary
+
+# Hvis dere bruker Git LFS for store filer (valgfritt)
+# Git LFS må aktiveres: git lfs install && git lfs track "<pattern>"
+# Example:
+# *.mp4 filter=lfs diff=lfs merge=lfs -text
+# *.psd filter=lfs diff=lfs merge=lfs -text

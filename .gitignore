@@ -1,0 +1,69 @@
+# Node / package managers
+node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarnrc.yml
+.pnp.*
+.eslintcache
+
+# Next.js / Vercel / Turbo
+.next/
+out/
+dist/
+build/
+.vercel/
+.turbo/
+.next.static/
+
+# Test & coverage
+coverage/
+.playwright/
+test-output/
+junit.xml
+
+# Caches
+.cache/
+.parcel-cache/
+.vscode/.history/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+# men behold eksempelfil
+!.env.example
+
+# Local DB / sqlite (hvis brukt i dev)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+/tmp/db/
+
+# Generated assets
+*.map
+
+# Storybook (om dere bruker det)
+.storybook-out/
+storybook-static/
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
