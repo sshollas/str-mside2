@@ -15,8 +15,10 @@ type Props = {
   initialDump: PriceDump;
 };
 
+type AugmentedOffer = Offer & { estimatedMonthly?: number; promoted?: boolean };
+
 // Enkel “forretningssignal”: boost hvis vi har affiliate-programId.
-function businessScore(o: Offer & { estimatedMonthly?: number }) {
+function businessScore(o: AugmentedOffer) {
   const affiliateBoost = o.programId ? 0.1 : 0;
   const price = o.estimatedMonthly ?? Number.POSITIVE_INFINITY;
   return affiliateBoost + 1 / Math.max(1, price);
@@ -45,11 +47,11 @@ export default function StromClient({ initialDump }: Props) {
     [initialDump.offers]
   );
 
-  const offers: (Offer & { estimatedMonthly?: number; promoted?: boolean })[] = useMemo(() => {
+  const offers: AugmentedOffer[] = useMemo(() => {
     const activeArea = area === "auto" ? suggestedArea : area;
 
-    // Start med alle fra dump
-    let list = initialDump.offers.slice();
+    // Start som AugmentedOffer[] for å kunne legge på estimatedMonthly/promoted senere
+    let list: AugmentedOffer[] = initialDump.offers.slice() as AugmentedOffer[];
 
     // 0) Skjul tilbud uten gyldig CTA (orderUrl mangler)
     list = list.filter((o) => !!o.url && o.url.trim().length > 0);
@@ -78,7 +80,9 @@ export default function StromClient({ initialDump }: Props) {
 
     // 3) Sortering (primær)
     if (sort === "rec") {
-      const before = [...list].sort((a, b) => (a.estimatedMonthly ?? 0) - (b.estimatedMonthly ?? 0));
+      const before = [...list].sort(
+        (a, b) => (a.estimatedMonthly ?? Number.POSITIVE_INFINITY) - (b.estimatedMonthly ?? Number.POSITIVE_INFINITY)
+      );
       list.sort((a, b) => businessScore(b) - businessScore(a));
       const posBefore = new Map(before.map((o, i) => [o.id, i]));
       list = list.map((o, i) => {
@@ -105,16 +109,15 @@ export default function StromClient({ initialDump }: Props) {
       });
     }
 
-    // 4) Sikkerhetsnett (sekundær sorteringsnøkkel):
-    //    selv om vi per nå skjuler uten CTA, behold en guard som alltid
-    //    skyver "uten CTA" nederst dersom de noen gang skulle vises.
+    // 4) Sikkerhetsnett – uten CTA nederst (skulle vi endre filteret senere)
     list.sort((a, b) => {
       const aOk = !!a.url && a.url.trim().length > 0 ? 0 : 1;
       const bOk = !!b.url && b.url.trim().length > 0 ? 0 : 1;
-      return aOk - bOk; // alle uten CTA ender etter alle med CTA
+      return aOk - bOk;
     });
 
     if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
       console.debug("[strom] counts", {
         total: initialDump.offers.length,
         afterFilters: list.length,
