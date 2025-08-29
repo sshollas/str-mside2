@@ -1,227 +1,156 @@
-// components/strom/FloatingFilter.tsx
 "use client";
-import { useEffect, useRef } from "react";
 
-export type ContractType = "spot" | "variable" | "fixed" | null;
-type Area = { code: string; name: string };
+import { useEffect, useMemo, useState } from "react";
 
-export type ThemeMode = "auto" | "light" | "dark";
+type Theme = "auto" | "light" | "dark";
 
 type Props = {
-  open: boolean;
-  onClose: () => void;
+  /** Start-åpen panel (valgfritt) */
+  initialOpen?: boolean;
+  /** Start-tema (valgfritt). Hvis ikke gitt, lastes fra localStorage eller "auto". */
+  theme?: Theme;
+  /** Callback ved temaendring (valgfritt) */
+  onThemeChange?: (t: Theme) => void;
 
-  areas: Area[];
-  areaCode: string;
-  onChangeArea: (code: string) => void;
-
-  usage: number;
-  onChangeUsage: (v: number) => void;
-
-  contract: ContractType;
-  onChangeContract: (v: ContractType) => void;
-
-  sort: "price" | "name";
-  onChangeSort: (v: "price" | "name") => void;
-
-  query: string;
-  onChangeQuery: (v: string) => void;
-
-  onReset?: () => void;
-  applyLabel?: string;
-
-    theme: ThemeMode;
-  onChangeTheme: (t: ThemeMode) => void;
-
+  /** Valgfritt: vis/bygg egne filterinnhold i panelet */
+  children?: React.ReactNode;
 };
 
+/**
+ * Flytende filterpanel (FAB -> panel).
+ * Denne komponenten er selvstendig og vil ikke feile build dersom den ikke brukes.
+ * Den håndterer tema-toggle via data-theme på <html>.
+ */
 export default function FloatingFilter({
-  open, onClose,
-  areas, areaCode, onChangeArea,
-  usage, onChangeUsage,
-  contract, onChangeContract,
-  sort, onChangeSort,
-  query, onChangeQuery,
-  onReset, applyLabel = "Bruk filtre",
+  initialOpen = false,
+  theme: themeProp,
+  onThemeChange,
+  children,
 }: Props) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(initialOpen);
+  const [theme, setTheme] = useState<Theme>(themeProp || "auto");
 
-  // ESC for å lukke
+  // Tillatte temaer til UI-knapper
+  const THEME_OPTS = useMemo(
+    () =>
+      [
+        { v: "auto", label: "Auto" },
+        { v: "light", label: "Lyst" },
+        { v: "dark", label: "Mørkt" },
+      ] as Array<{ v: Theme; label: string }>,
+    []
+  );
+
+  // Lese preferanse fra localStorage (kun første gang hvis prop ikke er satt)
   useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose]);
+    if (themeProp) return; // styres utenfra
+    try {
+      const saved = localStorage.getItem("theme-preference") as Theme | null;
+      if (saved === "auto" || saved === "light" || saved === "dark") {
+        setTheme(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, [themeProp]);
 
-  if (!open) return null;
+  // Bruk media query for auto
+  const systemPrefersDark = useMemo(
+    () => (typeof window !== "undefined" ? window.matchMedia?.("(prefers-color-scheme: dark)") : null),
+    []
+  );
+
+  // Funksjon for å apply tema på <html data-theme="...">
+  function applyTheme(t: Theme) {
+    const root = document.documentElement;
+    if (!root) return;
+    if (t === "auto") {
+      const dark = systemPrefersDark?.matches ?? false;
+      root.setAttribute("data-theme", dark ? "dark" : "light");
+    } else {
+      root.setAttribute("data-theme", t);
+    }
+    // Hint til UA for native form-styles etc.
+    (root.style as any).colorScheme = t === "auto" ? (systemPrefersDark?.matches ? "dark" : "light") : t;
+  }
+
+  // Kjør apply ved mount og når theme endres
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    applyTheme(theme);
+    onThemeChange?.(theme);
+    try {
+      localStorage.setItem("theme-preference", theme);
+    } catch {
+      // ignore
+    }
+    // Re-apply når OS-tema endres og vi står i auto
+    if (systemPrefersDark) {
+      const listener = () => {
+        if (theme === "auto") applyTheme("auto");
+      };
+      systemPrefersDark.addEventListener?.("change", listener);
+      return () => systemPrefersDark.removeEventListener?.("change", listener);
+    }
+  }, [theme, onThemeChange, systemPrefersDark]);
+
+  // Hjelper for klikkskifte
+  function handleThemeClick(next: Theme) {
+    setTheme(next);
+  }
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* “usynlig” overlay for å kunne klikke utenfor og lukke */}
+    <>
+      {/* FAB */}
       <button
-        aria-hidden
-        className="absolute inset-0 pointer-events-auto bg-transparent"
-        onClick={onClose}
-      />
-      {/* Selve panelet nederst til venstre – hovrer over innholdet */}
-      <div
-        ref={panelRef}
-        className="
-          pointer-events-auto
-          absolute left-4 bottom-20 md:bottom-6
-          w-[92vw] max-w-[520px]
-          rounded-2xl border bg-white shadow-xl
-          p-4 md:p-5
-        "
-        role="dialog"
-        aria-modal="true"
-        aria-label="Filtre & sortering"
+        type="button"
+        className="fixed left-4 bottom-4 z-40 rounded-full shadow-lg px-4 py-3 border bg-white dark:bg-neutral-900"
+        aria-expanded={open}
+        aria-controls="floating-filter-panel"
+        onClick={() => setOpen((v) => !v)}
       >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold">Filtre & sortering</h2>
-          <button
-            onClick={onClose}
-            className="px-2 py-1 text-sm rounded border"
-            aria-label="Lukk"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {/* Søk */}
-          <section>
-            <label className="block text-xs font-medium mb-1">Søk</label>
-            <input
-              value={query}
-              onChange={(e) => onChangeQuery(e.target.value)}
-              placeholder="Søk etter avtale/leverandør"
-              className="w-full rounded border px-3 py-2"
-            />
-          </section>
-
-          {/* Område */}
-          <section>
-            <label className="block text-xs font-medium mb-1">Prisområde</label>
-            <select
-              value={areaCode}
-              onChange={(e) => onChangeArea(e.target.value)}
-              className="w-full rounded border px-3 py-2"
-            >
-              {areas.map(a => (
-                <option key={a.code} value={a.code}>{a.name}</option>
-              ))}
-            </select>
-          </section>
-
-          {/* Forbruk */}
-          <section>
-            <label className="block text-xs font-medium mb-2">Forbruk (kWh/mnd)</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={300}
-                max={4000}
-                step={100}
-                value={usage}
-                onChange={(e) => onChangeUsage(Number(e.target.value))}
-                className="flex-1"
-              />
-              <div className="w-20 text-right text-sm">{usage} kWh</div>
-            </div>
-          </section>
-
-          {/* Kontraktstype */}
-          <section>
-            <label className="block text-xs font-medium mb-2">Kontraktstype</label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { v: null, label: "Alle" },
-                { v: "spot", label: "Spot" },
-                { v: "variable", label: "Variabel" },
-                { v: "fixed", label: "Fastpris" },
-              ].map(opt => (
-                <button
-                  key={String(opt.v)}
-                  onClick={() => onChangeContract(opt.v as any)}
-                  className={[
-                    "px-3 py-1.5 rounded border text-sm",
-                    contract === opt.v ? "bg-gray-900 text-white border-gray-900" : "bg-white"
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
-  <label className="block text-xs font-medium mb-2">Tema</label>
-  <div className="flex gap-2">
-    {[
-      { v: "auto", label: "Auto" },
-      { v: "light", label: "Lyst" },
-      { v: "dark", label: "Mørkt" },
-    ].map(opt => (
-      <button
-        key={opt.v}
-        onClick={() => onChangeTheme(opt.v as any)}
-        className={[
-          "px-3 py-1.5 rounded border text-sm",
-          theme === opt.v ? "bg-gray-900 text-white border-gray-900" : "bg-white"
-        ].join(" ")}
-      >
-        {opt.label}
+        {open ? "Lukk filter" : "Filter"}
       </button>
-    ))}
-  </div>
-</section>
 
+      {/* Panel */}
+      {open && (
+        <div
+          id="floating-filter-panel"
+          role="dialog"
+          aria-modal="false"
+          className="fixed left-4 bottom-20 z-40 w-[min(92vw,360px)] rounded-2xl border shadow-xl p-4 bg-white dark:bg-neutral-900"
+        >
+          <div className="mb-3 font-semibold">Innstillinger</div>
 
-          {/* Sortering */}
-          <section>
-            <label className="block text-xs font-medium mb-2">Sorter etter</label>
-            <div className="flex gap-2">
+          {/* Tema-toggle */}
+          <div className="mb-2 text-sm">Tema</div>
+          <div className="flex gap-2 mb-4">
+            {THEME_OPTS.map((opt) => (
               <button
-                onClick={() => onChangeSort("price")}
+                key={opt.v}
+                type="button"
+                onClick={() => handleThemeClick(opt.v)}
                 className={[
                   "px-3 py-1.5 rounded border text-sm",
-                  sort === "price" ? "bg-gray-900 text-white border-gray-900" : "bg-white"
+                  theme === opt.v ? "bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-black dark:border-white" : "bg-white dark:bg-neutral-800",
                 ].join(" ")}
+                aria-pressed={theme === opt.v}
               >
-                Laveste månedspris
+                {opt.label}
               </button>
-              <button
-                onClick={() => onChangeSort("name")}
-                className={[
-                  "px-3 py-1.5 rounded border text-sm",
-                  sort === "name" ? "bg-gray-900 text-white border-gray-900" : "bg-white"
-                ].join(" ")}
-              >
-                Navn A–Å
-              </button>
+            ))}
+          </div>
+
+          {/* Valgfritt ekstra filterinnhold */}
+          {children ? (
+            <div className="mt-2">{children}</div>
+          ) : (
+            <div className="text-sm opacity-80">
+              Detaljerte filtre ligger i sidepanelet. Denne knappen kan brukes til tema og (senere) hurtigfiltre.
             </div>
-          </section>
+          )}
         </div>
-
-        <div className="flex items-center justify-between gap-3 pt-4 mt-4 border-t">
-          <button
-            className="px-3 py-2 rounded border text-sm"
-            onClick={onReset}
-            type="button"
-          >
-            Tilbakestill
-          </button>
-          <button
-            className="px-4 py-2 rounded bg-gray-900 text-white"
-            onClick={onClose}
-            type="button"
-          >
-            {applyLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }
