@@ -1,6 +1,16 @@
 // lib/strom/utils.ts
 
-// ===== Typer vi bruker i hele appen =====
+// ===== Domene-typer =====
+
+export type Area = "no1" | "no2" | "no3" | "no4" | "no5";
+
+export const AREA_OPTIONS: { code: Area; name: string }[] = [
+  { code: "no1", name: "Øst-Norge" },
+  { code: "no2", name: "Sør/Vest-Norge" },
+  { code: "no3", name: "Midt-Norge" },
+  { code: "no4", name: "Nord-Norge" },
+  { code: "no5", name: "Vest-Norge" },
+];
 
 export type Offer = {
   id: string;
@@ -9,7 +19,7 @@ export type Offer = {
   url: string; // orderUrl – kan være tom hvis mangler
   trackingUrl?: string;
   programId?: string;
-  area?: string; // NO1..NO5 (lowercase)
+  area?: Area; // NO1..NO5 (lowercase)
   municipality?: string;
   contractType: "spotpris" | "fastpris" | "variabel" | (string & {});
   // Prisfelt
@@ -87,7 +97,7 @@ export function formatDateLongNb(iso: string): string {
   });
 }
 
-// ===== Leverandør-API (ikke blueprint/mock) =====
+// ===== Leverandør-API (ikke blueprint) =====
 
 export type VendorOffer = {
   id: string;
@@ -122,6 +132,11 @@ export function mapVendorToPriceDump(items: VendorOffer[]): { updatedAt: string;
   const offers: Offer[] = items.map((v) => {
     const url = firstNonEmpty(v.deeplink, v.url, v.landingPage, v.link);
     const trackingUrl = firstNonEmpty(v.trackingUrl, v.tracking as any, v.trackUrl as any);
+    const areaLower = v.area?.toLowerCase();
+    const area = (areaLower === "no1" || areaLower === "no2" || areaLower === "no3" || areaLower === "no4" || areaLower === "no5"
+      ? (areaLower as Area)
+      : undefined);
+
     return {
       id: v.id,
       vendor: v.supplier,
@@ -129,7 +144,7 @@ export function mapVendorToPriceDump(items: VendorOffer[]): { updatedAt: string;
       url, // kan være tom
       trackingUrl,
       programId: v.programId,
-      area: v.area?.toLowerCase(),
+      area,
       municipality: v.municipality,
       contractType: (v.contractType?.toLowerCase() as Offer["contractType"]) || "spotpris",
       spotPrice: v.spotNokPerKwh,
@@ -164,7 +179,7 @@ export const VendorHelpers = {
  * Grov heuristikk fra kommunenavn til områdekode (no1..no5).
  * Brukes kun for forslag i filteret ("Auto"), ikke som auto-filter.
  */
-export function areaFromMunicipality(name: string | undefined): string | undefined {
+export function areaFromMunicipality(name: string | undefined): Area | undefined {
   if (!name) return undefined;
   const k = name.trim().toLowerCase();
 

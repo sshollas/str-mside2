@@ -1,84 +1,43 @@
-'use client';
+"use client";
 
-import styles from './strom.module.css';
-import type { Area } from '@/lib/strom/utils';
+import styles from "./strom.module.css";
+import { AREA_OPTIONS, type Area } from "@/lib/strom/utils";
 
-export type UsageTier = 'low' | 'mid' | 'high';
+export type UsageTier = "low" | "mid" | "high";
 
-export default function StromSidebar({
-  collapsed = false,          // (kan utvides senere)
-  areas,
-  areaCode,
-  usageTier,
-  onChangeArea,
-  onChangeTier
-}: {
-  collapsed?: boolean;
-  areas: Area[];
-  areaCode: string;
-  usageTier: UsageTier;
-  onChangeArea: (code: string) => void;
-  onChangeTier: (tier: UsageTier) => void;
-}) {
+type AreaFilter = "alle" | "auto" | Area;
+
+type Props = {
+  area: AreaFilter;
+  onArea: (v: AreaFilter) => void;
+  suggestedArea?: Area;
+};
+
+export default function StromSidebar({ area, onArea, suggestedArea }: Props) {
   return (
-    <aside className={styles.sidebar} aria-label="Filtre">
-      <div className={styles.sidebarHeader}>
-        <strong>Filtre</strong>
-      </div>
-
-      <div className={styles.filtersWrap}>
-
-        <div className={styles.filterGroup}>
-          <div className={styles.filterIcon}>📍</div>
-          <div className={styles.filterBody}>
-            <label>Område</label>
-            <select
-              value={areaCode}
-              onChange={(e) => onChangeArea(e.target.value)}
-            >
-              {areas.map(a => (
-                <option key={a.code} value={a.code}>
-                  {a.name} ({a.code})
-                </option>
-              ))}
-            </select>
-          </div>
+    <aside className={styles.sidebar} aria-label="Filtermeny">
+      <div className={styles.block}>
+        <label className={styles.label}>Område</label>
+        <select
+          className={styles.select}
+          value={area}
+          onChange={(e) => onArea(e.target.value as AreaFilter)}
+        >
+          <option value="alle">Alle</option>
+          {suggestedArea ? (
+            <option value="auto">Auto ({suggestedArea.toUpperCase()})</option>
+          ) : (
+            <option value="auto">Auto</option>
+          )}
+          {AREA_OPTIONS.map((a) => (
+            <option key={a.code} value={a.code}>
+              {a.name} ({a.code.toUpperCase()})
+            </option>
+          ))}
+        </select>
+        <div className={styles.hint}>
+          Velg “Auto” for å foreslå område fra kommune, eller sett manuelt.
         </div>
-
-        <div className={styles.filterGroup}>
-          <div className={styles.filterIcon}>
-            <span className={`${styles.tierDot} ${
-              usageTier === 'low' ? styles.tierLow : usageTier === 'mid' ? styles.tierMid : styles.tierHigh
-            }`} />
-          </div>
-          <div className={styles.filterBody}>
-            <label>Årlig forbruk</label>
-            <div className={styles.tierButtons}>
-              <button
-                className={`${styles.tierBtn} ${usageTier === 'low' ? styles.tierBtnActive : ''}`}
-                onClick={() => onChangeTier('low')}
-                aria-pressed={usageTier === 'low'}
-              >
-                Lite
-              </button>
-              <button
-                className={`${styles.tierBtn} ${usageTier === 'mid' ? styles.tierBtnActive : ''}`}
-                onClick={() => onChangeTier('mid')}
-                aria-pressed={usageTier === 'mid'}
-              >
-                Middels
-              </button>
-              <button
-                className={`${styles.tierBtn} ${usageTier === 'high' ? styles.tierBtnActive : ''}`}
-                onClick={() => onChangeTier('high')}
-                aria-pressed={usageTier === 'high'}
-              >
-                Mye
-              </button>
-            </div>
-          </div>
-        </div>
-
       </div>
     </aside>
   );
