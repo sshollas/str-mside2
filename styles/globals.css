@@ -42,9 +42,9 @@ html[data-theme="dark"] {
 
 /* base */
 *, *::before, *::after { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
 body.bg-app { background: var(--bg); color: var(--text); }
-.container { width: min(1100px, 100%); margin: 0 auto; padding: 0 16px; }
+.container { width: min(1500px, 100%); margin: 0 auto; padding: 0 16px; }
 
 .skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 .skip-link:focus {
@@ -65,7 +65,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
   .strom-layout { grid-template-columns: 1fr; }
   .strom-sidebar { position: static; top: auto; }
 }
-.strom-sidebar { position: sticky; top: 16px; }
+.strom-sidebar { position: sticky; top: 16px; margin-top: 20px; margin-bottom: 20px;}
 
 /* sidepanel form */
 .filter-side {
@@ -90,6 +90,23 @@ body.bg-app { background: var(--bg); color: var(--text); }
 .link { font-size: 14px; color: var(--accent); text-decoration: underline; }
 .sep { border: 0; height: 1px; background: var(--border); margin: 12px 0; }
 
+/* usage tier picker */
+.usage-tiers { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 420px) {
+  .usage-tiers { grid-template-columns: 1fr 1fr 1fr; }
+}
+.usage-tier-btn {
+  display: grid; align-items: center; justify-items: center;  align-content: center;  justify-content: center;
+  padding: 10px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); cursor: pointer;
+}
+.usage-tier-btn:hover { border-color: color-mix(in oklab, var(--border), var(--text) 20%); }
+.usage-tier-btn.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent), transparent 70%);
+}
+.usage-tier-label { font-weight: 600; }
+.usage-tier-sub { font-size: 12px; color: var(--muted); }
+
 /* deal list */
 .deal-stack { display: grid; gap: 10px; margin: 10px 45px; }
 .deal-header-row { display: none; }
@@ -99,9 +116,10 @@ body.bg-app { background: var(--bg); color: var(--text); }
     grid-template-columns: minmax(220px, 2fr) 1fr 1fr 1fr auto;
     padding: 0 45px; margin: 10px 0; font-size: 12px; color: var(--muted);
   }
-  .deal-header-left { grid-column: 1/2; }
-  .deal-header-mid { text-align: center; }
-  .deal-header-right { text-align: right; }
+  .deal-header-1 { grid-column: 1/4; }
+  .deal-header-2 { grid-column: 2/4; }
+  .deal-header-3 { grid-column: 3/4; }
+  .deal-header-4 { grid-column: 4/4; }
 }
 
 /* Boks: radius 16px, padding 15px, margin 45px sider / 10px topp/bunn */
@@ -119,7 +137,9 @@ body.bg-app { background: var(--bg); color: var(--text); }
 }
 .deal-cell { min-width: 0; }
 .deal-name {
-  grid-row: 1 / span 2; grid-column: 1 / 2; display: grid; gap: 6px;
+  grid-row: 1 / span 2; grid-column: 1 / 2;
+  display: grid; gap: 6px;
+  grid-template-rows: auto auto 1fr auto; /* plasser toggle nederst */
 }
 .deal-title { font-weight: 600; }
 .deal-title .vendor { opacity: 0.85; }
@@ -131,7 +151,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
 .deal-col-value { font-size: 15px; font-variant-numeric: tabular-nums; }
 .deal-cta { grid-row: 1 / span 2; grid-column: 5 / 6; display: grid; justify-items: end; align-items: center; gap: 8px; }
 .btn-cta {
-  display: inline-flex; align-items: center; justify-content: center; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 16px;
   background: var(--accent); color: var(--accent-contrast); padding: 10px 14px; text-decoration: none; font-weight: 600;
   border: 1px solid color-mix(in oklab, var(--accent), #000 10%); transition: transform .05s ease, filter .2s ease;
 }
@@ -161,15 +181,17 @@ body.bg-app { background: var(--bg); color: var(--text); }
   text-align: center;
 }
 
-/* Toggle-lenke øverst i boksen */
+/* Toggle-knappen: nå nederst-venstre i venstrecellen */
 .deal-expand-toggle {
-  margin-top: 8px;
+  margin-top: 0;
   padding: 4px 8px;
   font-size: 0.875rem;
   border: 1px solid var(--border);
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
+  justify-self: start;
+  align-self: end; /* nederst */
 }
 
 .deal-open .deal-expand-toggle {
@@ -188,17 +210,9 @@ body.bg-app { background: var(--bg); color: var(--text); }
   margin: 8px 0;
 }
 
-.deal-details-row.error {
-  color: var(--danger, #b00020);
-}
-
-.deal-details-title {
-  font-weight: 600;
-}
-
-.deal-details-sub {
-  opacity: 0.8;
-}
+.deal-details-row.error { color: var(--danger, #b00020); }
+.deal-details-title { font-weight: 600; }
+.deal-details-sub { opacity: 0.8; }
 
 .grid-two {
   display: grid;
@@ -206,17 +220,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
   gap: 12px;
 }
 
-.muted {
-  font-size: 0.875rem;
-  opacity: 0.8;
-}
+.muted { font-size: 0.875rem; opacity: 0.8; }
+.emph { font-size: 1.1rem; font-weight: 600; }
 
-.emph {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.deal-details-row.links a {
-  margin-right: 16px;
-  text-decoration: underline;
-}
+.deal-details-row.links a { margin-right: 16px; text-decoration: underline; }

@@ -6,36 +6,66 @@ import { slugify, type Offer, type PriceDump } from "@/lib/strom/utils";
 
 let client: Client | null = null;
 let schemaEnsured = false;
+let warnedOnce = false;
+
+function warnOnce(msg: string) {
+  if (!warnedOnce) {
+    // eslint-disable-next-line no-console
+    console.warn(`[db] ${msg}`);
+    warnedOnce = true;
+  }
+}
 
 function getUrl(): string | null {
-  return (
+  const raw =
     process.env.LIBSQL_URL ||
     process.env.TURSO_DATABASE_URL ||
-    null
-  );
+    null;
+  return raw ? raw.trim() : null;
 }
 
 function getAuth(): string | undefined {
-  return (
+  const raw =
     process.env.LIBSQL_AUTH_TOKEN ||
     process.env.TURSO_AUTH_TOKEN ||
-    undefined
-  );
+    undefined;
+  return raw?.trim() || undefined;
 }
 
-function hasDb(): boolean {
-  const url = getUrl();
-  return !!url && /^libsql:\/\//.test(url);
+function isValidLibsqlUrl(raw?: string | null): raw is string {
+  if (!raw) return false;
+  const s = raw.trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    // må være libsql: og ha host (eks: libsql://xxxxx.turso.io)
+    return u.protocol === "libsql:" && !!u.hostname;
+  } catch {
+    return false;
+  }
 }
 
 function getClient(): Client | null {
-  if (!hasDb()) return null;
-  if (!client) {
-    const url = getUrl();
-    if (!url) return null;
-    client = createClient({ url, authToken: getAuth() });
+  if (client) return client;
+
+  const url = getUrl();
+  if (!isValidLibsqlUrl(url)) {
+    if (url) {
+      warnOnce(`Ignorerer ugyldig LIBSQL_URL="${url}" – DB-laget deaktiveres, faller tilbake til API/mock.`);
+    } else {
+      warnOnce("LIBSQL_URL ikke satt – DB-laget er valgfritt og er deaktivert.");
+    }
+    return null;
   }
-  return client;
+
+  try {
+    client = createClient({ url, authToken: getAuth() });
+    return client;
+  } catch (e) {
+    warnOnce(`Kunne ikke initialisere libSQL-klient: ${(e as Error).message}. DB-laget deaktiveres.`);
+    client = null;
+    return null;
+  }
 }
 
 // --- skjema -------------------------------------------------------------------
@@ -44,7 +74,7 @@ async function ensureSchema(): Promise<void> {
   if (schemaEnsured) return;
   const db = getClient();
   if (!db) return;
-  // price_snapshots: lagrer hele PriceDump for historikk/debug
+
   await db.execute({
     sql: `
       CREATE TABLE IF NOT EXISTS price_snapshots (
@@ -56,7 +86,6 @@ async function ensureSchema(): Promise<void> {
     args: [],
   });
 
-  // vendors: unikt navn/slug
   await db.execute({
     sql: `
       CREATE TABLE IF NOT EXISTS vendors (
@@ -67,7 +96,6 @@ async function ensureSchema(): Promise<void> {
     args: [],
   });
 
-  // offers: lagre siste kjente versjon per offer.id + vendordata for raske oppslag
   await db.execute({
     sql: `
       CREATE TABLE IF NOT EXISTS offers (
@@ -86,9 +114,7 @@ async function ensureSchema(): Promise<void> {
 
 // --- offentlige API-er --------------------------------------------------------
 
-/**
- * Returner ferskeste PriceDump fra DB, eller null hvis ikke finnes/ingen DB.
- */
+/** Returner ferskeste PriceDump fra DB, eller null hvis ikke finnes/ingen DB. */
 export async function getLatestPriceDump(): Promise<PriceDump | null> {
   const db = getClient();
   if (!db) return null;
@@ -103,11 +129,8 @@ export async function getLatestPriceDump(): Promise<PriceDump | null> {
   if (!row) return null;
 
   try {
-    const parsed = JSON.parse(String(row.dump_json)) as PriceDump;
-    // Sørg for at updatedAt finnes
-    if (!parsed.updatedAt) {
-      parsed.updatedAt = String(row.updated_at);
-    }
+    const parsed = JSON.parse(String((row as any).dump_json)) as PriceDump;
+    if (!parsed.updatedAt) parsed.updatedAt = String((row as any).updated_at);
     parsed.source = "db";
     return parsed;
   } catch {
@@ -115,26 +138,20 @@ export async function getLatestPriceDump(): Promise<PriceDump | null> {
   }
 }
 
-/**
- * Lagre dagens offers (upsert) og ta et snapshot.
- * Tåler manglende DB (no-op).
- */
+/** Lagre dagens offers (upsert) og ta et snapshot. Tåler manglende DB (no-op). */
 export async function upsertOffersAndSnapshot(dump: PriceDump): Promise<void> {
   const db = getClient();
   if (!db) return; // valgfri DB
   await ensureSchema();
 
-  // Snapshot først
   await db.execute({
     sql: `INSERT INTO price_snapshots (updated_at, dump_json) VALUES (?, ?)`,
     args: [dump.updatedAt, JSON.stringify(dump)],
   });
 
-  // Upsert vendors + offers
   for (const o of dump.offers) {
     const vslug = slugify(o.vendor);
 
-    // vendors
     await db.execute({
       sql: `
         INSERT INTO vendors (vendor_slug, name)
@@ -145,7 +162,6 @@ export async function upsertOffersAndSnapshot(dump: PriceDump): Promise<void> {
       args: [vslug, o.vendor],
     });
 
-    // offers
     await db.execute({
       sql: `
         INSERT INTO offers (id, vendor, vendor_slug, updated_at, offer_json)
@@ -161,9 +177,7 @@ export async function upsertOffersAndSnapshot(dump: PriceDump): Promise<void> {
   }
 }
 
-/**
- * Liste over leverandører (slug + navn).
- */
+/** Liste over leverandører (slug + navn). */
 export async function getVendors(): Promise<Array<{ slug: string; name: string }>> {
   const db = getClient();
   if (!db) return [];
@@ -183,9 +197,7 @@ export async function getVendors(): Promise<Array<{ slug: string; name: string }
   return items;
 }
 
-/**
- * Hent alle offers for en gitt vendor-slug.
- */
+/** Hent alle offers for en gitt vendor-slug. */
 export async function getOffersByVendorSlug(slug: string): Promise<Offer[]> {
   const db = getClient();
   if (!db) return [];
@@ -208,9 +220,7 @@ export async function getOffersByVendorSlug(slug: string): Promise<Offer[]> {
   return out;
 }
 
-/**
- * Enkel hjelp for å rydde gammel historikk (valgfritt å bruke).
- */
+/** Valgfritt: rydde gammel historikk. */
 export async function pruneSnapshots(keepLastN = 50): Promise<void> {
   const db = getClient();
   if (!db) return;

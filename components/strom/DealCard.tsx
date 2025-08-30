@@ -11,6 +11,8 @@ import {
   formatDateLongNb,
   type Offer,
 } from "@/lib/strom/utils";
+import { Plus, Minus } from "lucide-react";
+import { UsageIcon } from "@/components/strom/UsageIcon";
 
 type Props = {
   offer: (Offer & { estimatedMonthly?: number; promoted?: boolean });
@@ -46,7 +48,6 @@ export function DealCard({ offer, variant = "row" }: Props) {
 
   const monthLabel = useMemo(() => {
     const d = new Date();
-    // f.eks. "august"
     return d.toLocaleDateString("nb-NO", { month: "long" });
   }, []);
 
@@ -78,6 +79,15 @@ export function DealCard({ offer, variant = "row" }: Props) {
     ? formatOrePerKwh((details?.addonNokPerKwh ?? offer.addonNokPerKwh) as number)
     : "—";
 
+  const perKwh =
+    details?.perKwhTotalNok ??
+    offer.perKwhTotalNok ??
+    (offer.addonNokPerKwh != null && offer.spotPrice != null ? offer.spotPrice + offer.addonNokPerKwh : undefined);
+  const approxKwh =
+    perKwh && offer.estimatedMonthly != null
+      ? Math.max(0, Math.round((offer.estimatedMonthly - (offer.monthlyFee || 0)) / perKwh))
+      : undefined;
+
   return (
     <article
       className={`deal-box deal-grid ${open ? "deal-open" : ""}`}
@@ -107,18 +117,19 @@ export function DealCard({ offer, variant = "row" }: Props) {
             </span>
           ) : null}
         </div>
-
-        {/* Åpne/Lukk hint for tilgjengelighet */}
+        {/* NB: Knappen plasseres nederst-venstre via CSS i .deal-name */}
         <button
           type="button"
-          className="deal-expand-toggle"
+          className="deal-expand-toggle inline-flex items-center gap-1"
           aria-expanded={open}
           onClick={(e) => {
             e.stopPropagation();
             handleToggle();
           }}
+          title={open ? "Lukk" : "Åpne"}
         >
-          {open ? "Lukk" : "Åpne"}
+          {open ? <Minus className="w-4 h-4" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
+          <span className="sr-only">{open ? "Lukk" : "Åpne"}</span>
         </button>
       </div>
 
@@ -170,27 +181,24 @@ export function DealCard({ offer, variant = "row" }: Props) {
         <Sparkline points={offer.sparkline ?? []} />
       </div>
 
-      {/* DETALJPANEL – spenner hele bredden når åpen */}
+      {/* DETALJPANEL */}
       {open && (
         <div className="deal-details" role="region" aria-label={`Detaljer for ${offer.name}`}>
           {loading && <div className="deal-details-row">Laster detaljer …</div>}
           {err && <div className="deal-details-row error">{err}</div>}
           {!loading && !err && (
             <>
-              {/* Topptekst som hos Forbrukerrådet */}
               <div className="deal-details-row">
                 <div className="deal-details-title">{offer.name}</div>
                 <div className="deal-details-sub">{offer.vendor}</div>
               </div>
 
-              {/* Sist endret */}
               {details?.updatedAt ? (
                 <div className="deal-details-row">
                   Vilkårene til denne avtalen ble sist endret {formatDateLongNb(details.updatedAt)}.
                 </div>
               ) : null}
 
-              {/* Påslag (i øre) – kun for spotpris */}
               <div className="deal-details-row grid-two">
                 <div>
                   <div className="muted">Påslag til {offer.vendor}</div>
@@ -205,12 +213,14 @@ export function DealCard({ offer, variant = "row" }: Props) {
                 </div>
               </div>
 
-              {/* Estimat for aktiv måned */}
-              <div className="deal-details-row">
-                <div className="muted">Beregnet strømutgift for {monthLabel}</div>
-                <div className="emph">
-                  {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
+              <div className="deal-details-row flex items-center gap-3">
+                <div>
+                  <div className="muted">Beregnet strømutgift for {monthLabel}</div>
+                  <div className="emph">
+                    {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
+                  </div>
                 </div>
+                <UsageIcon kwhMonthly={approxKwh} />
               </div>
 
               <div className="deal-details-row">
@@ -219,7 +229,6 @@ export function DealCard({ offer, variant = "row" }: Props) {
                 </div>
               </div>
 
-              {/* Lenker */}
               <div className="deal-details-row links">
                 {details?.pricelistUrl ? (
                   <a href={details.pricelistUrl} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>

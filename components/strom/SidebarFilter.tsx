@@ -1,17 +1,25 @@
 "use client";
 
+import MunicipalitySelect from "@/components/strom/MunicipalitySelect";
+import UsageTierPicker from "@/components/strom/UsageTierPicker";
+import type { Area } from "@/lib/strom/utils";
+
 type Warranty = { ge12: boolean; m6to11: boolean; lt6: boolean };
+type SortKey = "est" | "addon" | "fee" | "name" | "rec";
+type AreaFilter = "alle" | "auto" | Area;
 
 type Props = {
   municipality: string;
   onMunicipality: (v: string) => void;
 
-  area: string;
-  onArea: (v: string) => void;
-  suggestedArea?: string;
+  area: AreaFilter;
+  onArea: (v: AreaFilter) => void;
+  suggestedArea?: Area;
+  onSuggestedArea?: (a?: Area) => void;
 
-  yearlyConsumption: number;
-  onYearlyConsumption: (v: number) => void;
+  /** Primærsannhet: månedlig forbruk i kWh */
+  monthlyConsumption: number;
+  onMonthlyConsumption: (v: number) => void;
 
   unsure: boolean;
   onUnsure: (v: boolean) => void;
@@ -29,66 +37,52 @@ type Props = {
   warrantyFilters: Warranty;
   onWarrantyFilters: (v: Warranty) => void;
 
-  sort: "est" | "addon" | "fee" | "name" | "rec";
-  onSort: (v: "est" | "addon" | "fee" | "name" | "rec") => void;
-
-  monthlyConsumption: number;
+  sort: SortKey;
+  onSort: (v: SortKey) => void;
 
   onReset?: () => void;
 };
 
 export function SidebarFilter(props: Props) {
   const autoLabel = props.suggestedArea ? `Auto (${props.suggestedArea.toUpperCase()})` : "Auto (ukjent)";
+  const yearly = Math.max(0, Math.round(props.monthlyConsumption * 12)); // hint
 
   return (
     <form className="filter-side" onSubmit={(e) => e.preventDefault()}>
-      <div className="form-group">
-        <label className="label">Kommune</label>
-        <select
-          className="select"
-          value={props.municipality}
-          onChange={(e) => props.onMunicipality(e.target.value)}
-        >
-          <option>Oslo</option>
-          <option>Bergen</option>
-          <option>Trondheim</option>
-          <option>Tromsø</option>
-          <option>Stavanger</option>
-        </select>
-      </div>
+      {/* Kommune / postnummer */}
+      <MunicipalitySelect
+        value={props.municipality}
+        onChange={props.onMunicipality}
+        onAreaSuggest={(a) => props.onSuggestedArea?.(a)}
+      />
 
+      {/* Forbruk (MÅNEDLIG) */}
       <div className="form-group">
-        <label className="label">Hva er ditt årlige forbruk?</label>
+        <label className="label">Hva er ditt månedlige forbruk?</label>
         <div className="input-with-suffix">
           <input
             className="input"
             type="number"
             min={0}
-            step={100}
-            value={props.yearlyConsumption}
-            onChange={(e) => props.onYearlyConsumption(Number(e.target.value || 0))}
+            step={10}
+            value={props.monthlyConsumption}
+            onChange={(e) => props.onMonthlyConsumption(Number(e.target.value || 0))}
           />
-          <span className="suffix">kWt</span>
+          <span className="suffix">kWh/mnd</span>
         </div>
-        <div className="hint">(Sjekk strømregningen din)</div>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={props.unsure}
-            onChange={(e) => {
-              props.onUnsure(e.target.checked);
-              if (e.target.checked && props.yearlyConsumption === 0) {
-                props.onYearlyConsumption(16000);
-              }
-            }}
-          />
-          Usikker?
-        </label>
-        <div className="hint">≈ {props.monthlyConsumption} kWh per måned</div>
+        <UsageTierPicker
+          monthly={props.monthlyConsumption}
+          onPick={(monthly) => {
+            props.onMonthlyConsumption(monthly);
+            if (props.unsure && monthly > 0) props.onUnsure(false);
+          }}
+        />
+        <div className="hint">≈ {yearly.toLocaleString("nb-NO")} kWh per år</div>        
       </div>
 
       <hr className="sep" />
 
+      {/* Søk */}
       <div className="form-group">
         <label className="label">Søk</label>
         <div className="input-with-icon">
@@ -104,6 +98,7 @@ export function SidebarFilter(props: Props) {
         </div>
       </div>
 
+      {/* Selskap */}
       <div className="form-group">
         <label className="label">Velg selskap</label>
         <select className="select" value={props.vendor} onChange={(e) => props.onVendor(e.target.value)}>
@@ -117,6 +112,7 @@ export function SidebarFilter(props: Props) {
 
       <hr className="sep" />
 
+      {/* Avtaletype */}
       <fieldset className="form-group">
         <legend className="label">Avtaletype</legend>
         <label className="radio">
@@ -140,6 +136,7 @@ export function SidebarFilter(props: Props) {
 
       <hr className="sep" />
 
+      {/* Vilkår */}
       <fieldset className="form-group">
         <legend className="label">Vilkårsgaranti</legend>
         <label className="checkbox">
@@ -158,20 +155,22 @@ export function SidebarFilter(props: Props) {
 
       <hr className="sep" />
 
+      {/* Område */}
       <div className="form-group">
         <label className="label">Område</label>
-        <select className="select" value={props.area} onChange={(e) => props.onArea(e.target.value)}>
+        <select className="select" value={props.area} onChange={(e) => props.onArea(e.target.value as AreaFilter)}>
           <option value="alle">Alle</option>
-          {props.suggestedArea ? <option value="auto">{autoLabel}</option> : null}
+          {props.suggestedArea ? <option value="auto">{autoLabel}</option> : <option value="auto">Auto (ukjent)</option>}
           <option value="no1">NO1</option>
           <option value="no2">NO2</option>
           <option value="no3">NO3</option>
           <option value="no4">NO4</option>
           <option value="no5">NO5</option>
         </select>
-        <div className="hint">Velg “Auto” for å bruke område ut fra kommune.</div>
+        <div className="hint">Velg “Auto” for å bruke område ut fra kommune/postnummer.</div>
       </div>
 
+      {/* Sortering */}
       <div className="form-group">
         <label className="label">Sorter</label>
         <select

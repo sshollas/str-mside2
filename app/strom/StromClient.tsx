@@ -8,16 +8,13 @@ import {
   type PriceDump,
   type Offer,
   VendorHelpers,
-  areaFromMunicipality,
+  type Area,
 } from "@/lib/strom/utils";
 
-type Props = {
-  initialDump: PriceDump;
-};
-
+type Props = { initialDump: PriceDump };
 type AugmentedOffer = Offer & { estimatedMonthly?: number; promoted?: boolean };
 
-// Enkel “forretningssignal”: boost hvis vi har affiliate-programId.
+// Enkel forretningsscore
 function businessScore(o: AugmentedOffer) {
   const affiliateBoost = o.programId ? 0.1 : 0;
   const price = o.estimatedMonthly ?? Number.POSITIVE_INFINITY;
@@ -26,11 +23,12 @@ function businessScore(o: AugmentedOffer) {
 
 export default function StromClient({ initialDump }: Props) {
   const [municipality, setMunicipality] = useState<string>("Oslo");
-  const [area, setArea] = useState<string>("alle");
+  const [suggestedArea, setSuggestedArea] = useState<Area | undefined>(undefined);
+  const [area, setArea] = useState<"alle" | "auto" | Area>("alle");
   const [contractType, setContractType] = useState<string>("alle");
   const [query, setQuery] = useState("");
   const [vendor, setVendor] = useState<string>("alle");
-  const [yearlyConsumption, setYearlyConsumption] = useState<number>(16000);
+  const [monthlyConsumption, setMonthlyConsumption] = useState<number>(1333); // primærsannhet (kWh/mnd)
   const [unsure, setUnsure] = useState<boolean>(false);
   const [sort, setSort] = useState<"est" | "addon" | "fee" | "name" | "rec">("est");
   const [warrantyFilters, setWarrantyFilters] = useState<{ ge12: boolean; m6to11: boolean; lt6: boolean }>({
@@ -39,24 +37,17 @@ export default function StromClient({ initialDump }: Props) {
     lt6: false,
   });
 
-  const monthlyConsumption = useMemo(() => Math.round((yearlyConsumption || 0) / 12), [yearlyConsumption]);
-  const suggestedArea = useMemo(() => areaFromMunicipality(municipality), [municipality]);
-
-  const vendorOptions = useMemo(
-    () => ["alle", ...VendorHelpers.uniqueVendors(initialDump.offers)],
-    [initialDump.offers]
-  );
+  const vendorOptions = useMemo(() => ["alle", ...VendorHelpers.uniqueVendors(initialDump.offers)], [initialDump.offers]);
 
   const offers: AugmentedOffer[] = useMemo(() => {
     const activeArea = area === "auto" ? suggestedArea : area;
 
-    // Start som AugmentedOffer[] for å kunne legge på estimatedMonthly/promoted senere
     let list: AugmentedOffer[] = initialDump.offers.slice() as AugmentedOffer[];
 
-    // 0) Skjul tilbud uten gyldig CTA (orderUrl mangler)
+    // Skjul uten CTA
     list = list.filter((o) => !!o.url && o.url.trim().length > 0);
 
-    // 1) Filtrering
+    // Filtrering
     if (activeArea && activeArea !== "alle") list = list.filter((o) => o.area?.toLowerCase() === activeArea);
     if (contractType !== "alle") list = list.filter((o) => o.contractType.toLowerCase() === contractType);
     if (vendor !== "alle") list = list.filter((o) => o.vendor === vendor);
@@ -75,10 +66,10 @@ export default function StromClient({ initialDump }: Props) {
       });
     }
 
-    // 2) Estimat
+    // Estimat (bruk månedlig forbruk direkte)
     list = list.map((o) => ({ ...o, estimatedMonthly: estimateMonthlyCost(o, monthlyConsumption) }));
 
-    // 3) Sortering (primær)
+    // Sortering
     if (sort === "rec") {
       const before = [...list].sort(
         (a, b) => (a.estimatedMonthly ?? Number.POSITIVE_INFINITY) - (b.estimatedMonthly ?? Number.POSITIVE_INFINITY)
@@ -109,21 +100,12 @@ export default function StromClient({ initialDump }: Props) {
       });
     }
 
-    // 4) Sikkerhetsnett – uten CTA nederst (skulle vi endre filteret senere)
+    // Sikkerhetsnett: uten CTA nederst
     list.sort((a, b) => {
       const aOk = !!a.url && a.url.trim().length > 0 ? 0 : 1;
       const bOk = !!b.url && b.url.trim().length > 0 ? 0 : 1;
       return aOk - bOk;
     });
-
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.debug("[strom] counts", {
-        total: initialDump.offers.length,
-        afterFilters: list.length,
-        filters: { municipality, suggestedArea, activeArea, contractType, vendor, q, warrantyFilters, sort },
-      });
-    }
 
     return list;
   }, [
@@ -136,7 +118,6 @@ export default function StromClient({ initialDump }: Props) {
     sort,
     monthlyConsumption,
     warrantyFilters,
-    municipality,
   ]);
 
   const hasNoResults = offers.length === 0;
@@ -159,9 +140,10 @@ export default function StromClient({ initialDump }: Props) {
           area={area}
           onArea={setArea}
           suggestedArea={suggestedArea}
-          yearlyConsumption={yearlyConsumption}
-          onYearlyConsumption={(v) => {
-            setYearlyConsumption(v);
+          onSuggestedArea={setSuggestedArea}
+          monthlyConsumption={monthlyConsumption}
+          onMonthlyConsumption={(v) => {
+            setMonthlyConsumption(v);
             if (!unsure && v === 0) setUnsure(true);
           }}
           unsure={unsure}
@@ -177,23 +159,14 @@ export default function StromClient({ initialDump }: Props) {
           onWarrantyFilters={setWarrantyFilters}
           sort={sort}
           onSort={setSort}
-          monthlyConsumption={monthlyConsumption}
           onReset={resetFilters}
         />
-
         <div className="hint mt-2">
-          Vi viser kun avtaler som kan bestilles (<strong>har lenke</strong>). Avtaler uten bestillingslenke vises ikke.
+          Vi foreslår område fra kommune eller postnummer. Velg <strong>Auto ({suggestedArea?.toUpperCase() ?? "—"})</strong> for å bruke forslaget.
         </div>
       </aside>
 
       <section className="deal-stack" aria-label="Strømavtaler">
-        <div className="deal-header-row" role="row" aria-hidden>
-          <div className="deal-header-left">Navn</div>
-          <div className="deal-header-mid">Påslag</div>
-          <div className="deal-header-mid">Månedsavgift</div>
-          <div className="deal-header-mid">Estimert pr. mnd</div>
-          <div className="deal-header-right sr-only md:not-sr-only">Kjøp</div>
-        </div>
 
         {hasNoResults ? (
           <div className="empty-state" role="status" aria-live="polite">

@@ -37,9 +37,9 @@ export default async function Page() {
     <>
       <main id="main" className="container">
         <header className="page-header">
-          <h1 className="text-2xl font-semibold">Strømsammenligning</h1>
+          <h1 className="text-2xl font-semibold">Strømsiden</h1>
           <p className="text-sm opacity-80">
-            Sammenlign spotpris, månedsavgift og estimert pris pr. måned.
+            Her kan du sammenligne alle strømavtaler, sammenlign spotpris, månedsavgift og estimert pris pr. måned - og finne ut hva som passer best for deg.
           </p>
         </header>
         <StromClient initialDump={data} />

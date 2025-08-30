@@ -1,0 +1,7 @@
+[
+  { "id": "0301", "name": "Oslo", "area": "no1" },
+  { "id": "4601", "name": "Bergen", "area": "no5" },
+  { "id": "5001", "name": "Trondheim", "area": "no3" },
+  { "id": "5401", "name": "Tromsø", "area": "no4" },
+  { "id": "1103", "name": "Stavanger", "area": "no2" }
+]
