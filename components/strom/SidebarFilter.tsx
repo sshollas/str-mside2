@@ -11,9 +11,6 @@ type Props = {
   monthlyConsumption: number;
   onMonthlyConsumption: (v: number) => void;
 
-  unsure: boolean;
-  onUnsure: (v: boolean) => void;
-
   query: string;
   onQuery: (v: string) => void;
 
@@ -35,8 +32,6 @@ export function SidebarFilter({
   onMunicipality,
   monthlyConsumption,
   onMonthlyConsumption,
-  unsure,
-  onUnsure,
   query,
   onQuery,
   vendor,
@@ -70,7 +65,9 @@ export function SidebarFilter({
       {/* Månedlig forbruk */}
       <div className="form-group">
         <label className="label" htmlFor="fld-monthly">Hva er ditt månedlige forbruk?</label>
-        <div className="input-with-suffix">
+
+        {/* Suffix inni input-boksen */}
+        <div className="input-suffix-inside">
           <input
             id="fld-monthly"
             className="input"
@@ -81,19 +78,12 @@ export function SidebarFilter({
             onChange={(e) => onMonthlyConsumption(Math.max(0, Number(e.target.value)))}
             placeholder="1500"
             inputMode="numeric"
+            aria-describedby="monthly-hint"
           />
-          <span className="suffix">kWh/mnd</span>
+          <span className="suffix" aria-hidden>kWh/mnd</span>
         </div>
-        <div className="hint">≈ {yearly.toLocaleString("nb-NO")} kWh per år</div>
-        <div className="checkbox">
-          <input
-            id="fld-unsure"
-            type="checkbox"
-            checked={unsure}
-            onChange={(e) => onUnsure(e.target.checked)}
-          />
-          <label htmlFor="fld-unsure">Usikker?</label>
-        </div>
+
+        <div id="monthly-hint" className="hint">≈ {yearly.toLocaleString("nb-NO")} kWh per år</div>
       </div>
 
       {/* Hurtigvalg – lite/middels/stort */}

@@ -30,7 +30,6 @@ export default function StromClient({ initialDump }: Props) {
   const [query, setQuery] = useState("");
   const [vendor, setVendor] = useState<string>("alle");
   const [monthlyConsumption, setMonthlyConsumption] = useState<number>(1333); // kWh/mnd
-  const [unsure, setUnsure] = useState<boolean>(false);
   const [sort, setSort] = useState<"est" | "addon" | "fee" | "name" | "rec">("est");
   const [warrantyFilters, setWarrantyFilters] = useState<{ ge12: boolean; m6to11: boolean; lt6: boolean }>({
     ge12: true,
@@ -137,12 +136,7 @@ export default function StromClient({ initialDump }: Props) {
           municipality={municipality}
           onMunicipality={setMunicipality}
           monthlyConsumption={monthlyConsumption}
-          onMonthlyConsumption={(v) => {
-            setMonthlyConsumption(v);
-            if (!unsure && v === 0) setUnsure(true);
-          }}
-          unsure={unsure}
-          onUnsure={setUnsure}
+          onMonthlyConsumption={(v) => setMonthlyConsumption(v)}
           query={query}
           onQuery={setQuery}
           vendor={vendor}
