@@ -12,7 +12,7 @@ import {
 } from "@/lib/strom/utils";
 
 type Props = { initialDump: PriceDump };
-type AugmentedOffer = Offer & { estimatedMonthly?: number; promoted?: boolean };
+type AugmentedOffer = Offer & { estimatedMonthly?: number; promoted?: boolean; expiredAt?: string | null };
 
 // Enkel forretningsscore
 function businessScore(o: AugmentedOffer) {
@@ -41,11 +41,20 @@ export default function StromClient({ initialDump }: Props) {
 
   const offers: AugmentedOffer[] = useMemo(() => {
     const activeArea = area === "auto" ? suggestedArea : area;
+    const now = new Date();
 
     let list: AugmentedOffer[] = initialDump.offers.slice() as AugmentedOffer[];
 
-    // Skjul uten CTA
+    // Skjul uten CTA (mangler URL) – disse kan ligge nederst eller ut, vi velger å fjerne helt.
     list = list.filter((o) => !!o.url && o.url.trim().length > 0);
+
+    // Skjul utløpte (expiredAt i fortiden)
+    list = list.filter((o) => {
+      const exp = (o as any).expiredAt as string | undefined | null;
+      if (!exp) return true;
+      const d = new Date(exp);
+      return isFinite(d.getTime()) ? d >= now : true;
+    });
 
     // Filtrering
     if (activeArea && activeArea !== "alle") list = list.filter((o) => o.area?.toLowerCase() === activeArea);
@@ -90,7 +99,7 @@ export default function StromClient({ initialDump }: Props) {
             return av - bv;
           }
           case "fee":
-            return a.monthlyFee - b.monthlyFee;
+            return (a.monthlyFee ?? Number.POSITIVE_INFINITY) - (b.monthlyFee ?? Number.POSITIVE_INFINITY);
           case "name":
             return a.name.localeCompare(b.name, "nb");
           case "est":
@@ -99,13 +108,6 @@ export default function StromClient({ initialDump }: Props) {
         }
       });
     }
-
-    // Sikkerhetsnett: uten CTA nederst
-    list.sort((a, b) => {
-      const aOk = !!a.url && a.url.trim().length > 0 ? 0 : 1;
-      const bOk = !!b.url && b.url.trim().length > 0 ? 0 : 1;
-      return aOk - bOk;
-    });
 
     return list;
   }, [
@@ -167,6 +169,13 @@ export default function StromClient({ initialDump }: Props) {
       </aside>
 
       <section className="deal-stack" aria-label="Strømavtaler">
+        <div className="deal-header-row" role="row" aria-hidden>
+          <div className="deal-header-left">Navn</div>
+          <div className="deal-header-mid">Påslag</div>
+          <div className="deal-header-mid">Månedsavgift</div>
+          <div className="deal-header-mid">Estimert pr. mnd</div>
+          <div className="deal-header-right sr-only md:not-sr-only">Kjøp</div>
+        </div>
 
         {hasNoResults ? (
           <div className="empty-state" role="status" aria-live="polite">

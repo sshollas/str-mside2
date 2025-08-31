@@ -12,10 +12,9 @@ import {
   type Offer,
 } from "@/lib/strom/utils";
 import { Plus, Minus } from "lucide-react";
-import { UsageIcon } from "@/components/strom/UsageIcon";
 
 type Props = {
-  offer: (Offer & { estimatedMonthly?: number; promoted?: boolean });
+  offer: (Offer & { estimatedMonthly?: number; promoted?: boolean; expiredAt?: string | null });
   variant?: "row";
 };
 
@@ -31,6 +30,12 @@ type OfferDetails = {
   orderUrl?: string;
   pricelistUrl?: string;
 };
+
+function bindingLabel(months?: number) {
+  if (months == null || months <= 0) return "Ingen binding";
+  if (months % 12 === 0) return `Binding ${months / 12} år`;
+  return `Binding ${months} mnd`;
+}
 
 export function DealCard({ offer, variant = "row" }: Props) {
   const [open, setOpen] = useState(false);
@@ -61,7 +66,7 @@ export function DealCard({ offer, variant = "row" }: Props) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: OfferDetails = await res.json();
         setDetails(data);
-      } catch (e) {
+      } catch {
         setErr("Kunne ikke hente flere detaljer nå.");
       } finally {
         setLoading(false);
@@ -70,6 +75,16 @@ export function DealCard({ offer, variant = "row" }: Props) {
   }, [open, details, offer.id]);
 
   if (variant !== "row") return null;
+
+  const labels = useMemo(() => {
+    const out: Array<{ text: string; className?: string; title?: string }> = [];
+    if (offer.contractType) out.push({ text: offer.contractType, className: "badge-type" });
+    if (offer.area) out.push({ text: offer.area.toUpperCase(), className: "badge-area" });
+    out.push({ text: bindingLabel(offer.warrantyMonths), className: offer.warrantyMonths ? "badge-binding" : "badge-nobind" });
+    if (!offer.monthlyFee) out.push({ text: "Uten månedsavgift", className: "badge-nofee" });
+    if (offer.promoted) out.push({ text: "Promotert", className: "badge-promoted", title: "Denne plasseringen kan være kommersielt påvirket" });
+    return out;
+  }, [offer.contractType, offer.area, offer.warrantyMonths, offer.monthlyFee, offer.promoted]);
 
   const showAddon =
     (details?.contractType ?? offer.contractType) === "spotpris" &&
@@ -83,17 +98,12 @@ export function DealCard({ offer, variant = "row" }: Props) {
     details?.perKwhTotalNok ??
     offer.perKwhTotalNok ??
     (offer.addonNokPerKwh != null && offer.spotPrice != null ? offer.spotPrice + offer.addonNokPerKwh : undefined);
-  const approxKwh =
-    perKwh && offer.estimatedMonthly != null
-      ? Math.max(0, Math.round((offer.estimatedMonthly - (offer.monthlyFee || 0)) / perKwh))
-      : undefined;
 
   return (
     <article
-      className={`deal-box deal-grid ${open ? "deal-open" : ""}`}
-      role="row"
-      onClick={handleToggle}
+      className={`deal-box ${open ? "deal-open" : ""}`}
       aria-expanded={open}
+      onClick={handleToggle}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -102,22 +112,69 @@ export function DealCard({ offer, variant = "row" }: Props) {
         }
       }}
     >
-      {/* VENSTRE: Navn + meta */}
-      <div className="deal-cell deal-name" role="cell">
-        <div className="deal-title">
-          <span className="vendor">{offer.vendor}</span>{" "}
-          <span className="name">{offer.name}</span>
+      {/* HOVEDLINJE: 5-kol grid */}
+      <div className="deal-grid" role="row">
+        <div className="deal-cell deal-name" role="cell" aria-label="Avtale">
+          <div className="deal-title name-only">{offer.name}</div>
+          <div className="deal-vendor">{offer.vendor}</div>
         </div>
-        <div className="deal-meta">
-          <span className="badge">{offer.contractType}</span>
-          {offer.area ? <span className="badge">{offer.area.toUpperCase()}</span> : null}
-          {offer.promoted ? (
-            <span className="badge badge-promoted" title="Denne plasseringen kan være kommersielt påvirket">
-              Promotert
-            </span>
+
+        <div className="deal-cell deal-col" role="cell" aria-label="Påslag per kWh">
+          <div className="deal-col-label">Påslag</div>
+          <div className="deal-col-value">
+            {offer.addonNokPerKwh != null ? formatNokPerKwh(offer.addonNokPerKwh) : "—"}
+          </div>
+        </div>
+
+        <div className="deal-cell deal-col" role="cell" aria-label="Månedsavgift">
+          <div className="deal-col-label">Månedsavgift</div>
+          <div className="deal-col-value">
+            {offer.monthlyFee != null ? `${formatCurrency(offer.monthlyFee)}/mnd` : "—"}
+          </div>
+        </div>
+
+        <div className="deal-cell deal-col" role="cell" aria-label="Estimert pr. mnd">
+          <div className="deal-col-label">Estimert pr. mnd</div>
+          <div className="deal-col-value">
+            {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
+          </div>
+          {offer.perKwhTotalNok != null ? (
+            <div className="deal-col-subtle" title="Total pris per kWh (inkl. spot+påslag+avgifter)">
+              Totalt: {formatNokPerKwh(offer.perKwhTotalNok)}
+            </div>
           ) : null}
         </div>
-        {/* NB: Knappen plasseres nederst-venstre via CSS i .deal-name */}
+
+        <div className="deal-cell deal-cta" role="cell">
+          {href ? (
+            <Link
+              href={href}
+              target="_blank"
+              rel="nofollow sponsored noopener"
+              className="btn-cta"
+              aria-label={`Gå til ${offer.vendor} – ${offer.name}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              Til avtale
+            </Link>
+          ) : (
+            <button className="btn-cta" disabled aria-disabled="true" title="Manglende bestillingslenke" onClick={(e) => e.stopPropagation()}>
+              Ikke tilgjengelig
+            </button>
+          )}
+          <Sparkline points={offer.sparkline ?? []} />
+        </div>
+      </div>
+
+      {/* BUNN-LINJE: labels venstre, toggle høyre */}
+      <div className="deal-bottom" role="presentation">
+        <div className="deal-labels">
+          {labels.map((b, i) => (
+            <span key={i} className={`badge ${b.className ?? ""}`} title={b.title || b.text}>
+              {b.text}
+            </span>
+          ))}
+        </div>
         <button
           type="button"
           className="deal-expand-toggle inline-flex items-center gap-1"
@@ -129,51 +186,8 @@ export function DealCard({ offer, variant = "row" }: Props) {
           title={open ? "Lukk" : "Åpne"}
         >
           {open ? <Minus className="w-4 h-4" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
-          <span className="sr-only">{open ? "" : ""}</span>
+          <span className="sr-only">{open ? "Lukk" : "Åpne"}</span>
         </button>
-      </div>
-
-      {/* MIDTKOLONNER */}
-      <div className="deal-cell deal-col" role="cell" aria-label="Påslag per kWh">
-        <div className="deal-col-label">Påslag</div>
-        <div className="deal-col-value">
-          {offer.addonNokPerKwh != null ? formatNokPerKwh(offer.addonNokPerKwh) : "—"}
-        </div>
-      </div>
-
-      <div className="deal-cell deal-col" role="cell" aria-label="Månedsavgift">
-        <div className="deal-col-label">Månedsavgift</div>
-        <div className="deal-col-value">
-          {offer.monthlyFee != null ? `${formatCurrency(offer.monthlyFee)}/mnd` : "—"}
-        </div>
-      </div>
-
-      <div className="deal-cell deal-col" role="cell" aria-label="Estimert pr. mnd">
-        <div className="deal-col-label">Estimert pr. mnd</div>
-        <div className="deal-col-value">
-          {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
-        </div>
-      </div>
-
-      {/* HØYRE: CTA */}
-      <div className="deal-cell deal-cta" role="cell">
-        {href ? (
-          <Link
-            href={href}
-            target="_blank"
-            rel="nofollow sponsored noopener"
-            className="btn-cta"
-            aria-label={`Gå til ${offer.vendor} – ${offer.name}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            Til avtale
-          </Link>
-        ) : (
-          <button className="btn-cta" disabled aria-disabled="true" title="Manglende bestillingslenke" onClick={(e) => e.stopPropagation()}>
-            Ikke tilgjengelig
-          </button>
-        )}
-        <Sparkline points={offer.sparkline ?? []} />
       </div>
 
       {/* DETALJPANEL */}
@@ -208,14 +222,11 @@ export function DealCard({ offer, variant = "row" }: Props) {
                 </div>
               </div>
 
-              <div className="deal-details-row flex items-center gap-3">
-                <div>
-                  <div className="muted">Beregnet strømutgift for {monthLabel}</div>
-                  <div className="emph">
-                    {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
-                  </div>
+              <div className="deal-details-row">
+                <div className="muted">Beregnet strømutgift for {monthLabel}</div>
+                <div className="emph">
+                  {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
                 </div>
-                <UsageIcon kwhMonthly={approxKwh} />
               </div>
 
               <div className="deal-details-row">
