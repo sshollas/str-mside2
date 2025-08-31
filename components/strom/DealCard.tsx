@@ -183,10 +183,10 @@ export function DealCard({ offer, variant = "row" }: Props) {
             e.stopPropagation();
             handleToggle();
           }}
-          title={open ? "Lukk" : "Åpne"}
+          title={open ? "" : ""}
         >
           {open ? <Minus className="w-4 h-4" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
-          <span className="sr-only">{open ? "Lukk" : "Åpne"}</span>
+          <span className="sr-only">{open ? "" : ""}</span>
         </button>
       </div>
 

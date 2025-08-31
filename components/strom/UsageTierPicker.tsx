@@ -3,45 +3,43 @@
 import { LightningBoltIcon } from "@radix-ui/react-icons";
 
 type Props = {
-  /** Nåværende månedlig forbruk i kWh */
-  monthly: number;
-  /** Callback når bruker velger et nivå (setter kWh/mnd) */
-  onPick: (monthlyKwh: number) => void;
+  /** Nåværende årlig forbruk i kWh */
+  yearly: number;
+  /** Callback når bruker velger et nivå (setter årlig kWh) */
+  onPick: (yearlyKwh: number) => void;
 };
 
 const TIERS = [
-  { id: "low",  label: "", monthly: 500,  size: 16, title: "Lite forbruk (≈ 500 kWh/mnd)" },
-  { id: "mid",  label: "", monthly: 1333, size: 24, title: "Middels forbruk (≈ 1 333 kWh/mnd)" },
-  { id: "high", label: "", monthly: 2400, size: 35, title: "Stort forbruk (≈ 2 400 kWh/mnd)" },
+  { id: "low", label: "Lite", monthly: 500,  yearly: 500 * 12,  size: 16, title: "Lite forbruk (≈ 500 kWh/mnd)" },
+  { id: "mid", label: "Middels", monthly: 1333, yearly: 1333 * 12, size: 24, title: "Middels forbruk (≈ 1 333 kWh/mnd)" },
+  { id: "high", label: "Stort", monthly: 2400, yearly: 2400 * 12, size: 35, title: "Stort forbruk (≈ 2 400 kWh/mnd)" },
 ] as const;
 
-type TierId = typeof TIERS[number]["id"];
-
-function nearestTier(monthly: number): TierId {
-  const diffs = TIERS.map((t) => ({ id: t.id, d: Math.abs(t.monthly - monthly) }));
+function nearestTier(yearly: number) {
+  const diffs = TIERS.map((t) => ({ id: t.id, d: Math.abs(t.yearly - yearly) }));
   diffs.sort((a, b) => a.d - b.d);
-  return diffs[0]?.id ?? "mid";
+  return diffs[0]?.id;
 }
 
-export default function UsageTierPicker({ monthly, onPick }: Props) {
-  const active = nearestTier(monthly);
+export default function UsageTierPicker({ yearly, onPick }: Props) {
+  const active = nearestTier(yearly);
 
   return (
     <div className="usage-tiers" role="group" aria-label="Velg typisk strømforbruk">
       {TIERS.map((t) => {
         const isActive = active === t.id;
-        const aria = t.title || "Forbruksnivå";
         return (
           <button
             key={t.id}
             type="button"
             className={`usage-tier-btn ${isActive ? "is-active" : ""}`}
-            onClick={() => onPick(t.monthly)}
-            title={aria}
-            aria-label={aria}
+            onClick={() => onPick(t.yearly)}
+            title={t.title}
             aria-pressed={isActive}
           >
             <LightningBoltIcon width={t.size} height={t.size} aria-hidden />
+            <span className="usage-tier-label">{t.label}</span>
+            <span className="usage-tier-sub">{t.monthly.toLocaleString("nb-NO")} kWh/mnd</span>
           </button>
         );
       })}

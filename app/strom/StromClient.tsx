@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DealCard } from "@/components/strom/DealCard";
 import { SidebarFilter } from "@/components/strom/SidebarFilter";
 import {
@@ -9,12 +9,12 @@ import {
   type Offer,
   VendorHelpers,
   type Area,
+  areaFromMunicipality,
 } from "@/lib/strom/utils";
 
 type Props = { initialDump: PriceDump };
 type AugmentedOffer = Offer & { estimatedMonthly?: number; promoted?: boolean; expiredAt?: string | null };
 
-// Enkel forretningsscore
 function businessScore(o: AugmentedOffer) {
   const affiliateBoost = o.programId ? 0.1 : 0;
   const price = o.estimatedMonthly ?? Number.POSITIVE_INFINITY;
@@ -22,13 +22,14 @@ function businessScore(o: AugmentedOffer) {
 }
 
 export default function StromClient({ initialDump }: Props) {
+  // Feltet kan være kommunenavn eller postnummer. Vi bruker det kun til å foreslå område (NO1–NO5).
   const [municipality, setMunicipality] = useState<string>("Oslo");
-  const [suggestedArea, setSuggestedArea] = useState<Area | undefined>(undefined);
-  const [area, setArea] = useState<"alle" | "auto" | Area>("alle");
+  const [suggestedArea, setSuggestedArea] = useState<Area | undefined>(() => areaFromMunicipality("Oslo"));
+
   const [contractType, setContractType] = useState<string>("alle");
   const [query, setQuery] = useState("");
   const [vendor, setVendor] = useState<string>("alle");
-  const [monthlyConsumption, setMonthlyConsumption] = useState<number>(1333); // primærsannhet (kWh/mnd)
+  const [monthlyConsumption, setMonthlyConsumption] = useState<number>(1333); // kWh/mnd
   const [unsure, setUnsure] = useState<boolean>(false);
   const [sort, setSort] = useState<"est" | "addon" | "fee" | "name" | "rec">("est");
   const [warrantyFilters, setWarrantyFilters] = useState<{ ge12: boolean; m6to11: boolean; lt6: boolean }>({
@@ -37,18 +38,21 @@ export default function StromClient({ initialDump }: Props) {
     lt6: false,
   });
 
+  // Når kommune/postnummer endrer seg → oppdater foreslått område (NO1–NO5)
+  useEffect(() => {
+    setSuggestedArea(areaFromMunicipality(municipality));
+  }, [municipality]);
+
   const vendorOptions = useMemo(() => ["alle", ...VendorHelpers.uniqueVendors(initialDump.offers)], [initialDump.offers]);
 
   const offers: AugmentedOffer[] = useMemo(() => {
-    const activeArea = area === "auto" ? suggestedArea : area;
     const now = new Date();
-
     let list: AugmentedOffer[] = initialDump.offers.slice() as AugmentedOffer[];
 
-    // Skjul uten CTA (mangler URL) – disse kan ligge nederst eller ut, vi velger å fjerne helt.
+    // Skjul kort uten CTA (mangler URL)
     list = list.filter((o) => !!o.url && o.url.trim().length > 0);
 
-    // Skjul utløpte (expiredAt i fortiden)
+    // Skjul utløpte
     list = list.filter((o) => {
       const exp = (o as any).expiredAt as string | undefined | null;
       if (!exp) return true;
@@ -56,27 +60,21 @@ export default function StromClient({ initialDump }: Props) {
       return isFinite(d.getTime()) ? d >= now : true;
     });
 
-    // Filtrering
-    if (activeArea && activeArea !== "alle") list = list.filter((o) => o.area?.toLowerCase() === activeArea);
+    // Filtrering (OBS: ikke område – det brukes kun i beregning, ikke som filter)
     if (contractType !== "alle") list = list.filter((o) => o.contractType.toLowerCase() === contractType);
     if (vendor !== "alle") list = list.filter((o) => o.vendor === vendor);
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((o) => o.name.toLowerCase().includes(q) || o.vendor.toLowerCase().includes(q));
 
-    const hasWarrantyFilter = warrantyFilters.ge12 || warrantyFilters.m6to11 || warrantyFilters.lt6;
-    if (hasWarrantyFilter) {
-      list = list.filter((o) => {
-        const m = o.warrantyMonths;
-        if (m == null) return true;
-        if (m >= 12 && warrantyFilters.ge12) return true;
-        if (m >= 6 && m <= 11 && warrantyFilters.m6to11) return true;
-        if (m < 6 && warrantyFilters.lt6) return true;
-        return false;
-      });
-    }
+    // Estimat – hvis dumpen inneholder spot for område, bruk den når tilbudet ikke har egen spot.
+    const areaSpot =
+      suggestedArea ? ((initialDump as any).spotByArea?.[suggestedArea] as number | undefined) : undefined;
 
-    // Estimat (bruk månedlig forbruk direkte)
-    list = list.map((o) => ({ ...o, estimatedMonthly: estimateMonthlyCost(o, monthlyConsumption) }));
+    list = list.map((o) => {
+      const effOffer: AugmentedOffer =
+        o.spotPrice || !areaSpot ? o : ({ ...o, spotPrice: areaSpot } as AugmentedOffer);
+      return { ...effOffer, estimatedMonthly: estimateMonthlyCost(effOffer, monthlyConsumption) };
+    });
 
     // Sortering
     if (sort === "rec") {
@@ -112,20 +110,19 @@ export default function StromClient({ initialDump }: Props) {
     return list;
   }, [
     initialDump.offers,
-    area,
+    initialDump,
     suggestedArea,
     contractType,
     vendor,
     query,
     sort,
     monthlyConsumption,
-    warrantyFilters,
+    warrantyFilters, // behold hvis du filtrerer på garanti
   ]);
 
   const hasNoResults = offers.length === 0;
 
   function resetFilters() {
-    setArea("alle");
     setContractType("alle");
     setVendor("alle");
     setQuery("");
@@ -139,10 +136,6 @@ export default function StromClient({ initialDump }: Props) {
         <SidebarFilter
           municipality={municipality}
           onMunicipality={setMunicipality}
-          area={area}
-          onArea={setArea}
-          suggestedArea={suggestedArea}
-          onSuggestedArea={setSuggestedArea}
           monthlyConsumption={monthlyConsumption}
           onMonthlyConsumption={(v) => {
             setMonthlyConsumption(v);
@@ -159,16 +152,28 @@ export default function StromClient({ initialDump }: Props) {
           onContractType={setContractType}
           warrantyFilters={warrantyFilters}
           onWarrantyFilters={setWarrantyFilters}
-          sort={sort}
-          onSort={setSort}
           onReset={resetFilters}
         />
-        <div className="hint mt-2">
-          Vi foreslår område fra kommune eller postnummer. Velg <strong>Auto ({suggestedArea?.toUpperCase() ?? "—"})</strong> for å bruke forslaget.
-        </div>
       </aside>
 
       <section className="deal-stack" aria-label="Strømavtaler">
+        {/* Toolbar over feeden – sortering */}
+        <div className="list-toolbar" role="region" aria-label="Visningsvalg">
+          <label htmlFor="sort" className="label" style={{ marginRight: 6 }}>Sorter:</label>
+          <select
+            id="sort"
+            className="select"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as any)}
+          >
+            <option value="est">Lavest estimat pr. mnd</option>
+            <option value="addon">Lavest påslag</option>
+            <option value="fee">Lavest månedsavgift</option>
+            <option value="name">Navn (A–Å)</option>
+            <option value="rec">Anbefalt</option>
+          </select>
+        </div>
+
         <div className="deal-header-row" role="row" aria-hidden>
           <div className="deal-header-left">Navn</div>
           <div className="deal-header-mid">Påslag</div>
