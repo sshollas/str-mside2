@@ -175,7 +175,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
 .deal-bottom {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
+  border-top: 0px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -212,7 +212,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
 .deal-expand-toggle {
   padding: 4px 8px;
   font-size: 0.875rem;
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
