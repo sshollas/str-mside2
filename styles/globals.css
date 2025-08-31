@@ -186,7 +186,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
   margin-top: 0;
   padding: 4px 8px;
   font-size: 0.875rem;
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   background: transparent;
   border-radius: 8px;
   cursor: pointer;

@@ -2,6 +2,7 @@
 
 import MunicipalitySelect from "@/components/strom/MunicipalitySelect";
 import UsageTierPicker from "@/components/strom/UsageTierPicker";
+import InlineSuffixInput from "@/components/ui/InlineSuffixInput";
 import type { Area } from "@/lib/strom/utils";
 
 type Warranty = { ge12: boolean; m6to11: boolean; lt6: boolean };
@@ -59,17 +60,19 @@ export function SidebarFilter(props: Props) {
       {/* Forbruk (MÅNEDLIG) */}
       <div className="form-group">
         <label className="label">Hva er ditt månedlige forbruk?</label>
-        <div className="input-with-suffix">
-          <input
-            className="input"
-            type="number"
-            min={0}
-            step={10}
-            value={props.monthlyConsumption}
-            onChange={(e) => props.onMonthlyConsumption(Number(e.target.value || 0))}
-          />
-          <span className="suffix">kWh/mnd</span>
-        </div>
+
+        <InlineSuffixInput
+          value={props.monthlyConsumption}
+          onChangeValue={(v) => props.onMonthlyConsumption(v)}
+          suffix="kWh"
+          inputClassName="input"
+          min={0}
+          step={10}
+          aria-label="Månedlig forbruk i kWh"
+        />
+
+        <div className="hint">≈ {yearly.toLocaleString("nb-NO")} kWh per år</div>
+
         <UsageTierPicker
           monthly={props.monthlyConsumption}
           onPick={(monthly) => {
@@ -77,7 +80,20 @@ export function SidebarFilter(props: Props) {
             if (props.unsure && monthly > 0) props.onUnsure(false);
           }}
         />
-        <div className="hint">≈ {yearly.toLocaleString("nb-NO")} kWh per år</div>        
+
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={props.unsure}
+            onChange={(e) => {
+              props.onUnsure(e.target.checked);
+              if (e.target.checked && props.monthlyConsumption === 0) {
+                props.onMonthlyConsumption(1333); // rimelig default
+              }
+            }}
+          />
+          Usikker?
+        </label>
       </div>
 
       <hr className="sep" />

@@ -129,7 +129,7 @@ export function DealCard({ offer, variant = "row" }: Props) {
           title={open ? "Lukk" : "Åpne"}
         >
           {open ? <Minus className="w-4 h-4" aria-hidden /> : <Plus className="w-4 h-4" aria-hidden />}
-          <span className="sr-only">{open ? "Lukk" : "Åpne"}</span>
+          <span className="sr-only">{open ? "" : ""}</span>
         </button>
       </div>
 
@@ -153,11 +153,6 @@ export function DealCard({ offer, variant = "row" }: Props) {
         <div className="deal-col-value">
           {offer.estimatedMonthly != null ? formatCurrency(offer.estimatedMonthly) : "—"}
         </div>
-        {offer.perKwhTotalNok != null ? (
-          <div className="deal-col-subtle" title="Total pris per kWh (inkl. spot+påslag+avgifter)">
-            Totalt: {formatNokPerKwh(offer.perKwhTotalNok)}
-          </div>
-        ) : null}
       </div>
 
       {/* HØYRE: CTA */}
