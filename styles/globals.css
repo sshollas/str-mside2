@@ -44,7 +44,7 @@ html[data-theme="dark"] {
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
 body.bg-app { background: var(--bg); color: var(--text); }
-.container { width: min(1500px, 100%); margin: 0 auto; padding: 0 16px; }
+.container { width: min(1200px, 100%); margin: 0 auto; padding: 0 16px; }
 
 .skip-link { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 .skip-link:focus {
@@ -131,7 +131,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
 .usage-tier-sub { font-size: 12px; color: var(--muted); }
 
 /* deal list */
-.deal-stack { display: grid; gap: 10px; margin: 10px 45px; }
+.deal-stack { display: grid; gap: 10px; margin: 10px 10px; }
 .deal-header-row { display: none; }
 @media (min-width: 768px) {
   .deal-header-row {
@@ -150,7 +150,7 @@ body.bg-app { background: var(--bg); color: var(--text); }
   align-items: center;
   gap: 8px;
   justify-content: flex-end;
-  margin: 0 45px 8px 45px;
+  margin: 0 0px 8px 60%;
 }
 .list-toolbar .select { height: 36px; }
 
